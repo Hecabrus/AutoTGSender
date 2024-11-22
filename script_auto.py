@@ -1,10 +1,11 @@
 from telethon import TelegramClient
 from telethon.errors import PeerFloodError, UsernameInvalidError, PhotoSaveFileInvalidError
+import asyncio
 import os
 
 # Fetch API credentials from environment variables
-api_id = os.getenv("25034610")  # Replace with your API ID if not using environment variables
-api_hash = os.getenv("c0fa4a5c494c45cb5e3a7df0b30ba076")  # Replace with your API Hash if not using environment variables
+api_id = os.getenv("API_ID")  # Fetch from environment variable
+api_hash = os.getenv("API_HASH")  # Fetch from environment variable
 
 # List of group/channel links
 group_links = [
@@ -46,7 +47,6 @@ Get access to Netflix, Spotify, YouTube, and more for FREE through our referral 
 image_url = 'https://i.imgur.com/a/5CcFTls.jpeg'  # Ensure this is the direct image URL
 
 async def send_message():
-    """Sends messages to the specified groups."""
     await client.start()
     for group in group_links:
         try:
@@ -78,9 +78,9 @@ async def send_message():
             continue  # Skip on errors
 
 async def main():
-    """Main entry point for the script."""
-    await send_message()
+    while True:
+        await send_message()
+        await asyncio.sleep(3600)  # Wait for 60 minutes before sending the next message
 
-# Start the Telegram client and run the main function
 with client:
     client.loop.run_until_complete(main())
