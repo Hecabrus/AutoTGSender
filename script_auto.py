@@ -2,6 +2,9 @@ from telethon import TelegramClient
 from telethon.errors import PeerFloodError, UsernameInvalidError, PhotoSaveFileInvalidError
 import asyncio
 import os
+from http.server import SimpleHTTPRequestHandler
+from socketserver import TCPServer
+import threading
 
 # Fetch API credentials from environment variables
 api_id = os.getenv("API_ID")  # Fetch from environment variable
@@ -45,6 +48,16 @@ Get access to Netflix, Spotify, YouTube, and more for FREE through our referral 
 
 # Image URL from Imgur
 image_url = 'https://i.imgur.com/a/5CcFTls.jpeg'  # Ensure this is the direct image URL
+
+# Health check handler on port 8000
+def start_health_check_server():
+    handler = SimpleHTTPRequestHandler
+    httpd = TCPServer(('', 8000), handler)
+    print("Starting health check server on port 8000...")
+    httpd.serve_forever()
+
+# Start health check server in a separate thread
+threading.Thread(target=start_health_check_server, daemon=True).start()
 
 async def send_message():
     await client.start()
