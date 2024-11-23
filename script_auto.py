@@ -1,16 +1,13 @@
-from telethon import TelegramClient
-from telethon.errors import PeerFloodError, UsernameInvalidError, PhotoSaveFileInvalidError
-import asyncio
 import os
-from http.server import SimpleHTTPRequestHandler
-from socketserver import TCPServer
-import threading
+import asyncio
+from telethon import TelegramClient
+from telethon.errors import PeerFloodError, UsernameInvalidError, PhotoSaveFileInvalidError, FloodWaitError
 
 # Fetch API credentials from environment variables
-api_id = os.getenv("API_ID")  # Fetch from environment variable
-api_hash = os.getenv("API_HASH")  # Fetch from environment variable
+api_id = os.getenv("TELEGRAM_API_ID")  # Set as an environment variable in hosting
+api_hash = os.getenv("TELEGRAM_API_HASH")  # Set as an environment variable in hosting
 
-# List of group/channel links
+# List of Telegram group/channel links
 group_links = [
     "https://t.me/Dark_escrow_group",
     "https://t.me/hackers_chatting_group",
@@ -33,9 +30,7 @@ group_links = [
     "https://t.me/earnmoneychatting"
 ]
 
-client = TelegramClient('my_session', api_id, api_hash)
-
-# Your custom message with spoiler and bot username
+# Your message content
 custom_text_message = """
 ||Unlock exclusive premium accounts with ease! 🎁
 Get access to Netflix, Spotify, YouTube, and more for FREE through our referral system.||
@@ -46,54 +41,58 @@ Get access to Netflix, Spotify, YouTube, and more for FREE through our referral 
 🚀 Don’t miss out on this amazing opportunity!
 """
 
-# Image URL from Imgur
-image_url = 'https://i.imgur.com/a/5CcFTls.jpeg'  # Ensure this is the direct image URL
+# Image URL (ensure it's direct)
+image_url = 'https://i.imgur.com/a/5CcFTls.jpeg'  # Replace with your image URL
 
-# Health check handler on port 8000
-def start_health_check_server():
-    handler = SimpleHTTPRequestHandler
-    httpd = TCPServer(('', 8000), handler)
-    print("Starting health check server on port 8000...")
-    httpd.serve_forever()
+# Initialize the Telegram client
+client = TelegramClient('my_session', api_id, api_hash)
 
-# Start health check server in a separate thread
-threading.Thread(target=start_health_check_server, daemon=True).start()
-
-async def send_message():
-    await client.start()
-    for group in group_links:
+async def send_to_group(group: str):
+    """
+    Sends a message with an image or text to a specific group.
+    """
+    try:
+        # Attempt to send an image with a caption
+        await client.send_file(group, image_url, caption=custom_text_message)
+        print(f"Image with caption sent to {group}")
+    except PeerFloodError:
+        print(f"Rate limit exceeded for {group}. Skipping.")
+    except PhotoSaveFileInvalidError:
+        print(f"Invalid photo for {group}. Skipping.")
+    except UsernameInvalidError:
+        print(f"Invalid username for {group}. Skipping.")
+    except FloodWaitError as e:
+        print(f"Flood wait error: Sleeping for {e.seconds} seconds.")
+        await asyncio.sleep(e.seconds)
+    except Exception as e:
+        print(f"Unexpected error sending image to {group}: {e}. Sending text message as fallback.")
         try:
-            # Attempt to send image with caption
-            await client.send_file(group, image_url, caption=custom_text_message)
-            print(f"Image with caption sent to {group}")
-            
-        except PeerFloodError:
-            print(f"Rate limit exceeded for {group}. Skipping.")
-            continue  # Skip if the bot is rate-limited
+            # Attempt to send text message as fallback
+            await client.send_message(group, custom_text_message)
+            print(f"Text message sent to {group}")
+        except Exception as inner_e:
+            print(f"Failed to send text message to {group}: {inner_e}")
 
-        except PhotoSaveFileInvalidError:
-            print(f"Invalid photo for {group}. Skipping.")
-            continue  # Skip if photo upload fails
-
-        except UsernameInvalidError:
-            print(f"Invalid username for {group}. Skipping.")
-            continue  # Skip if username is invalid for the group
-        
-        except Exception as e:
-            # If image sending fails, fallback to sending text message
-            print(f"Error sending image to {group}: {e}")
-            try:
-                # Attempt to send text message with spoiler
-                await client.send_message(group, custom_text_message)
-                print(f"Text message with spoiler sent to {group}")
-            except Exception as e:
-                print(f"Failed to send text message to {group}: {e}")
-            continue  # Skip on errors
+async def send_messages():
+    """
+    Sends messages to all groups in the group list.
+    """
+    for group in group_links:
+        print(f"Processing group: {group}")
+        await send_to_group(group)
+        await asyncio.sleep(10)  # Sleep to avoid hitting Telegram's rate limits
 
 async def main():
+    """
+    Main function to handle continuous execution with a delay between iterations.
+    """
     while True:
-        await send_message()
-        await asyncio.sleep(3600)  # Wait for 60 minutes before sending the next message
+        print("Starting a new message batch...")
+        await send_messages()
+        print("Batch complete. Sleeping for 1 hour.")
+        await asyncio.sleep(3600)  # Wait for 1 hour between batches
 
-with client:
-    client.loop.run_until_complete(main())
+# Run the client and start the main function
+if __name__ == "__main__":
+    with client:
+        client.loop.run_until_complete(main())
